@@ -1,0 +1,15 @@
+.DS_Store
+.env
+.env.*
+!.env.example
+**/node_modules/
+**/build/
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+terraform.tfvars
+backend.hcl
+kubeconfig*
+*.pem
+*.key
