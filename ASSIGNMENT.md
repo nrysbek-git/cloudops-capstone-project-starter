@@ -14,12 +14,19 @@
 приложение в containers, создать облачную инфраструктуру, развернуть workload в
 Kubernetes и построить безопасный CI/CD process.
 
-Если курс предоставляет учебный domain, итоговый результат должен быть доступен
-преподавателю через HTTPS по выданному student subdomain. Покупать собственный
-domain студент не обязан. Если учебный domain не предоставлен, обязательный
-результат демонстрируется через AWS Load Balancer URL, а DNS/TLS становятся
-bonus-заданиями. Проект должен восстанавливаться из Git repository по
-документации.
+В проекте проверяются три способа доступа к приложению:
+
+1. **Localhost — обязательно:** локальный full stack запускается через Docker
+   Compose и открывается по `http://localhost:8080`.
+2. **AWS Load Balancer URL — обязательно:** приложение в EKS доступно по
+   external hostname, созданному LoadBalancer Service. Покупать domain для этого
+   не нужно.
+3. **Custom domain + HTTPS — опционально:** если курс выдаёт student subdomain и
+   доступ к Route 53, DNS и TLS обязательны. Если domain не выдан, Route 53,
+   ExternalDNS и cert-manager считаются bonus-заданиями. Студент не обязан
+   покупать domain за собственные деньги.
+
+Проект должен восстанавливаться из Git repository по документации.
 
 ## 2. Целевая архитектура
 
@@ -34,8 +41,10 @@ flowchart LR
     GHA -->|terraform| AWS[AWS Infrastructure]
     GHA -->|kubectl / helm| EKS[Amazon EKS]
 
-    USER[Teacher browser] -->|HTTPS| DNS[Route 53]
-    DNS --> LB[AWS Load Balancer]
+    LOCAL[Student browser] -->|localhost:8080| COMPOSE[Docker Compose]
+    USER[Teacher browser] -->|Load Balancer URL| LB[AWS Load Balancer]
+    USER -. optional HTTPS .-> DNS[Route 53]
+    DNS -. custom domain .-> LB
     LB --> ING[NGINX Ingress Controller]
     ING --> FE[Frontend Service]
     FE --> FEP[Frontend Pods x2]
@@ -68,12 +77,17 @@ flowchart LR
 - Docker Compose;
 - Terraform implementation;
 - Kubernetes manifests;
-- Helm values;
+- готовые Helm charts/values (Helm использовать необязательно);
 - GitHub Actions workflows;
 - готовые AWS credentials;
 - готовая база данных, DNS record или TLS certificate.
 
 ## 4. Общие правила
+
+> **Helm не является обязательным требованием.** Приложение и controllers можно
+> развернуть обычными Kubernetes YAML через `kubectl apply`. Helm разрешён и
+> рекомендуется для сторонних controllers, но его отсутствие не снижает оценку,
+> если все ресурсы воспроизводимо описаны в Git и проходят acceptance criteria.
 
 1. Вся инфраструктура должна создаваться через Terraform. Ручное создание
    основных ресурсов в AWS Console не засчитывается.
@@ -196,6 +210,9 @@ curl http://localhost:8080/api/health
 - регистрация, вход, assessment и leaderboard работают;
 - данные сохраняются после `docker compose restart`;
 - `docker compose down --volumes` создаёт чистую БД при следующем запуске.
+
+Это первый обязательный checkpoint. Localhost подтверждает работоспособность
+контейнеров, но не заменяет финальное развёртывание в AWS.
 
 ## Task 4. Настроить Terraform remote state
 
@@ -420,25 +437,30 @@ kubectl -n cloudops-academy rollout status deployment/backend
 
 ### Требуется
 
-1. Установить NGINX Ingress Controller через Helm.
-2. Зафиксировать chart version.
+1. Установить NGINX Ingress Controller с помощью Kubernetes manifests или Helm.
+2. Зафиксировать используемую версию controller; при выборе Helm также
+   зафиксировать chart version.
 3. Создать Ingress resource:
    - `/` → frontend Service;
    - `/api` → backend Service или frontend Nginx proxy — выбранный request path
      должен быть объяснён;
-   - host → ваш domain name.
+   - host задаётся только при использовании custom domain; без domain Ingress
+     должен принимать запросы по Load Balancer hostname.
 4. Убедиться, что только ingress controller создаёт public LoadBalancer.
 
 ### Acceptance criteria
 
 ```bash
-helm list -A
 kubectl get ingress -A
 kubectl get service -n ingress-nginx
 ```
 
+Если использовался Helm, дополнительно покажите `helm list -A`.
+
 - AWS Load Balancer получает external address;
-- запрос с правильным Host header открывает frontend;
+- frontend открывается по AWS Load Balancer URL без `kubectl port-forward`;
+- при использовании custom domain запрос с правильным Host header также
+  открывает frontend;
 - `/api/health` возвращает HTTP 200;
 - backend не имеет собственного public endpoint.
 
@@ -453,7 +475,7 @@ kubectl get service -n ingress-nginx
 1. Использовать subdomain, выданный преподавателем, например
    `student07.cloudops.example.com`.
 2. Использовать учебную Route 53 hosted zone или delegated student hosted zone.
-3. Установить ExternalDNS через Helm.
+3. Установить ExternalDNS с помощью Kubernetes manifests или Helm.
 4. Использовать IRSA/Pod Identity вместо AWS keys в Pod.
 5. Ограничить ExternalDNS нужной hosted zone/domain filter.
 6. Добавить необходимые annotations к Ingress/Service.
@@ -478,8 +500,9 @@ curl -I http://YOUR_DOMAIN
 
 ### Требуется
 
-1. Установить cert-manager через Helm.
-2. Зафиксировать chart version.
+1. Установить cert-manager с помощью Kubernetes manifests или Helm.
+2. Зафиксировать версию cert-manager; при выборе Helm также зафиксировать chart
+   version.
 3. Создать Let's Encrypt staging ClusterIssuer.
 4. Проверить issuance в staging.
 5. Создать production ClusterIssuer.
@@ -535,7 +558,7 @@ checkout
 → ECR push with Git SHA
 → update Kubernetes manifests
 → database migration
-→ kubectl/Helm deployment
+→ kubectl deployment или Helm deployment
 → rollout verification
 → smoke test
 ```
@@ -546,7 +569,8 @@ checkout
 - failed build не меняет running deployment;
 - workflow использует temporary AWS credentials;
 - преподаватель может сопоставить running image tag с Git commit;
-- smoke test проверяет domain и `/api/health`.
+- smoke test проверяет AWS Load Balancer URL и `/api/health`;
+- если используется custom domain, smoke test дополнительно проверяет HTTPS URL.
 
 ## Task 15. Добавить security и reliability controls
 
@@ -590,11 +614,12 @@ kubectl -n cloudops-academy rollout undo deployment/frontend
 - architecture diagram;
 - technologies;
 - prerequisites;
-- localhost instructions;
+- localhost instructions и URL `http://localhost:8080`;
 - AWS bootstrap instructions;
 - GitHub variables/secrets без значений secrets;
 - deployment process;
-- DNS/TLS configuration;
+- AWS Load Balancer access instructions;
+- DNS/TLS configuration, если выполнена optional domain-часть;
 - troubleshooting;
 - rollback procedure;
 - cleanup procedure;
@@ -608,13 +633,15 @@ kubectl -n cloudops-academy rollout undo deployment/frontend
 3. Terraform state/backend и последний plan.
 4. ECR images с Git SHA.
 5. `kubectl get pods,services,ingress`.
-6. HTTPS domain в browser.
-7. Регистрацию нового пользователя.
-8. Прохождение assessment и сохранение score.
-9. Backend/RDS connectivity.
-10. Удаление Pod и автоматическое восстановление.
-11. Rollout или rollback.
-12. Отсутствие secrets в Git.
+6. Локальное приложение на `http://localhost:8080`.
+7. Облачное приложение по AWS Load Balancer URL.
+8. HTTPS custom domain, если domain был предоставлен или выполнен как bonus.
+9. Регистрацию нового пользователя.
+10. Прохождение assessment и сохранение score.
+11. Backend/RDS connectivity.
+12. Удаление Pod и автоматическое восстановление.
+13. Rollout или rollback.
+14. Отсутствие secrets в Git.
 
 ---
 
@@ -652,7 +679,7 @@ kubectl -n cloudops-academy rollout undo deployment/frontend
 │   ├── iam.tf
 │   ├── dns.tf
 │   └── outputs.tf
-├── helm-values/
+├── helm-values/                 # optional, только если выбран Helm
 │   ├── ingress-nginx.yml
 │   ├── external-dns.yml
 │   └── cert-manager.yml
@@ -664,15 +691,17 @@ kubectl -n cloudops-academy rollout undo deployment/frontend
 
 Добавьте в README или отдельный `EVIDENCE.md`:
 
-- [ ] ссылка на HTTPS application URL;
+- [ ] localhost screenshot (`http://localhost:8080`);
+- [ ] ссылка на AWS Load Balancer application URL;
+- [ ] ссылка на HTTPS custom domain, если выполнена optional domain-часть;
 - [ ] ссылка на successful infrastructure workflow;
 - [ ] ссылка на successful deployment workflow;
 - [ ] screenshot `terraform plan` summary;
 - [ ] screenshot ECR repositories/images;
 - [ ] screenshot EKS nodes;
 - [ ] screenshot Pods/Services/Ingress;
-- [ ] screenshot Route 53 record;
-- [ ] screenshot valid TLS certificate;
+- [ ] screenshot Route 53 record, если используется custom domain;
+- [ ] screenshot valid TLS certificate, если используется custom domain;
 - [ ] screenshot application dashboard;
 - [ ] screenshot assessment/leaderboard;
 - [ ] результат `/api/health`;
@@ -731,7 +760,8 @@ Actions/OIDC `+5`, security/reliability `+3`, documentation/defense `+2`.
 - индивидуально: 2 недели;
 - команда из 2 студентов: 7–10 дней;
 - рекомендуемая нагрузка: 25–40 часов;
-- checkpoint 1: localhost + containers;
+- checkpoint 1: localhost + containers (`http://localhost:8080`);
 - checkpoint 2: Terraform + AWS infrastructure;
 - checkpoint 3: Kubernetes + CI/CD;
-- финал: DNS + HTTPS + защита.
+- финал: AWS Load Balancer URL + защита;
+- optional/выданный курсом domain: DNS + HTTPS.
