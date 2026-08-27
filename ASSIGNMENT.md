@@ -14,8 +14,12 @@
 приложение в containers, создать облачную инфраструктуру, развернуть workload в
 Kubernetes и построить безопасный CI/CD process.
 
-Итоговый результат должен быть доступен преподавателю через HTTPS по вашему
-domain name и восстанавливаться из Git repository по документации.
+Если курс предоставляет учебный domain, итоговый результат должен быть доступен
+преподавателю через HTTPS по выданному student subdomain. Покупать собственный
+domain студент не обязан. Если учебный domain не предоставлен, обязательный
+результат демонстрируется через AWS Load Balancer URL, а DNS/TLS становятся
+bonus-заданиями. Проект должен восстанавливаться из Git repository по
+документации.
 
 ## 2. Целевая архитектура
 
@@ -440,10 +444,15 @@ kubectl get service -n ingress-nginx
 
 ## Task 12. Настроить Route 53 и ExternalDNS
 
+> Этот Task обязателен только тогда, когда преподаватель выдал student subdomain
+> и доступ к учебной Route 53 hosted zone. Студент не должен покупать domain за
+> собственные деньги. Без предоставленного domain Task 12 считается bonus.
+
 ### Требуется
 
-1. Использовать зарегистрированный domain/subdomain.
-2. Создать или использовать Route 53 hosted zone.
+1. Использовать subdomain, выданный преподавателем, например
+   `student07.cloudops.example.com`.
+2. Использовать учебную Route 53 hosted zone или delegated student hosted zone.
 3. Установить ExternalDNS через Helm.
 4. Использовать IRSA/Pod Identity вместо AWS keys в Pod.
 5. Ограничить ExternalDNS нужной hosted zone/domain filter.
@@ -463,6 +472,9 @@ curl -I http://YOUR_DOMAIN
 - ExternalDNS не может изменять чужие hosted zones.
 
 ## Task 13. Настроить TLS через cert-manager
+
+> Этот Task обязателен только при наличии выданного преподавателем subdomain.
+> Без учебного domain Task 13 считается bonus и не уменьшает основную оценку.
 
 ### Требуется
 
@@ -684,17 +696,23 @@ kubectl -n cloudops-academy rollout undo deployment/frontend
 | README, evidence и защита | 5 |
 | **Всего** | **100** |
 
+Если курс не предоставляет domain, 18 обязательных баллов за DNS/TLS
+перераспределяются так: VPC/networking `+4`, EKS/Kubernetes `+4`, GitHub
+Actions/OIDC `+5`, security/reliability `+3`, documentation/defense `+2`.
+Студент по-прежнему может выполнить DNS/TLS как bonus по согласованию.
+
 ## Критические требования
 
 Даже при высокой сумме проект не может получить проходную оценку, если:
 
-- приложение недоступно преподавателю;
+- приложение недоступно преподавателю через HTTPS subdomain или, если domain
+  не был предоставлен курсом, через AWS Load Balancer URL;
 - в Git найдены реальные credentials/secrets;
 - RDS открыт в интернет;
 - отсутствует Terraform code;
 - images не находятся в private registry;
 - deployment выполняется только вручную;
-- HTTPS certificate невалиден;
+- HTTPS certificate невалиден, когда студенту был предоставлен учебный domain;
 - студент не может объяснить request flow.
 
 # Bonus — до 15 дополнительных баллов
