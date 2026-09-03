@@ -7,9 +7,15 @@
 - `frontend/` — React frontend;
 - `backend/` — Node.js/Express REST API;
 - `database/init.sql` — PostgreSQL schema;
-- `ASSIGNMENT.md` — полное техническое задание и критерии оценки.
+- `ASSIGNMENT.md` — полное техническое задание;
+- `PREREQUISITES.md` — необходимые знания, инструменты и доступы;
+- `GRADING_RUBRIC.md` — правила оценивания и уровни выполнения;
+- `TROUBLESHOOTING.md` — безопасная диагностика типичных ошибок;
+- `COST_AND_CLEANUP.md` — AWS budget и обязательное удаление ресурсов.
 
-Начните с чтения [ASSIGNMENT.md](ASSIGNMENT.md). Ваша задача — самостоятельно
+Начните с [требований перед стартом](PREREQUISITES.md), затем прочитайте
+[полное задание](ASSIGNMENT.md) и [критерии оценки](GRADING_RUBRIC.md).
+Ваша задача — самостоятельно
 создать containerization, local environment, cloud infrastructure, Kubernetes,
 CI/CD, DNS и HTTPS.
 
@@ -18,7 +24,7 @@ CI/CD, DNS и HTTPS.
 - Dockerfiles и Docker Compose;
 - Terraform;
 - Kubernetes manifests;
-- Helm configuration;
+- Helm configuration (Helm необязателен);
 - GitHub Actions workflows;
 - готовые cloud resources и credentials.
 
