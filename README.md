@@ -1,5 +1,7 @@
 # CloudOps Academy — Student Starter
 
+[Русский](README.md) | [English](README_EN.md)
+
 Это starter repository для итогового DevOps capstone.
 
 ## Как должен выглядеть готовый проект
